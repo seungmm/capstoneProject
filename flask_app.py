@@ -4,14 +4,20 @@ from flask import Flask, jsonify, request
 from PIL import Image
 from torchvision import transforms
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 app = Flask(__name__)
-
-# ResNet-50 모델 불러오기
+CORS(app, resources={r'/*': {'origins': '*'}})
+# 손상 분류 모델 불러오기
 current_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(current_dir, 'model', 'secondmodel.pth')
-model = torch.load(model_path, map_location=torch.device('cpu'))
-model.eval()  # 모델을 평가 모드로 설정
+model_damage = torch.load(model_path, map_location=torch.device('cpu'))
+model_damage.eval()
+
+# 수리 방법 분류 모델 불러오기
+model_path = os.path.join(current_dir, 'model', 'repair_resnet_11_8.pth')
+model_repair = torch.load(model_path, map_location=torch.device('cpu'))
+model_damage.eval()
 
 # 이미지 전처리 함수
 preprocess = transforms.Compose([
@@ -22,8 +28,30 @@ preprocess = transforms.Compose([
 ])
 
 # 클래스 레이블 (원하는 클래스 레이블로 변경)
-class_labels = ['파손', '긁힘', '분리', '찌그러짐']
-
+damage_labels = ['파손', '긁힘', '이격', '찌그러짐']
+repair_labels = ['도색', '교체', '판금']
+cost_dic = {
+    '휠': {
+        '교체': '15 ~ 25만원',
+        '도색': '7 ~ 10만원',
+        '판금': '5 ~ 10만원'},
+    '도어': {
+            '교체': '40 ~ 60만원',
+            '도색': '20 ~ 25만원',
+            '판금': '20 ~ 25만원'},
+    '휀더': {
+            '교체' : '30 ~ 35만원',
+            '도색' : '19 ~ 25만원',
+            '판금' : '19 ~ 25만원'},
+    '앞 범퍼': {
+            '교체': '30 ~ 40만원',
+            '도색': '21 ~ 26만원',
+            '판금':  '21 ~ 26만원'},
+    '뒷 범퍼': {
+            '교체': '30 ~ 40만원',
+            '도색': '21 ~ 26만원',
+            '판금': '21 ~ 25만원'}
+}
 @app.route('/predict', methods=['GET','POST'])
 def predict():
     if request.method == 'POST':
@@ -48,19 +76,19 @@ def predict():
 
         # 모델로 예측 수행
         with torch.no_grad():
-            output = model(img)
-
+            output_damage = model_damage(img)
+            output_repair = model_repair(img)
         # 예측 결과 해석
-        _, predicted_class = output.max(1)
-        predicted_damage = class_labels[predicted_class.item()]
+        _, predicted_class_damage = output_damage.max(1)
+        _, predicted_class_repair = output_repair.max(1)
+        predicted_damage = damage_labels[predicted_class_damage.item()]
+        predicted_repair = repair_labels[predicted_class_repair.item()]
 
-        predicted_repair = "도색"
-        predicted_cost = "100만원"
 
         return jsonify({"parts" : parts,
                         "damage" : predicted_damage,
                         "repair" : predicted_repair,
-                        "cost" : predicted_cost
+                        "cost" : cost_dic[parts][predicted_repair]
                         })
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5000)
