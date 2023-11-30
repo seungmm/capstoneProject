@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app, resources={r'/*': {'origins': '*'}})
 # 손상 분류 모델 불러오기
 current_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(current_dir, 'model', 'secondmodel.pth')
+model_path = os.path.join(current_dir, 'model', 'damage_resnet_11_24.pth')
 model_damage = torch.load(model_path, map_location=torch.device('cpu'))
 model_damage.eval()
 
@@ -28,7 +28,7 @@ preprocess = transforms.Compose([
 ])
 
 # 클래스 레이블 (원하는 클래스 레이블로 변경)
-damage_labels = ['파손', '긁힘', '이격', '찌그러짐']
+damage_labels = ['파손', '스크레치', '이격', '찌그러짐']
 repair_labels = ['도색', '교체', '판금']
 cost_dic = {
     '휠': {
